@@ -1,0 +1,85 @@
+/* Nothing Desk Design System: Nothing OS Signature Aesthetic */
+:root {
+  /* Core Monochrome Palette */
+  --bg-pure-black: #000000;
+  --bg-desk-base: #08080a;
+  --bg-surface: #101014;
+  --bg-surface-elevated: #16161c;
+  --bg-surface-hover: #1f1f26;
+  --bg-surface-active: #282832;
+
+  /* Frosted Glass Layers */
+  --glass-bg: rgba(14, 14, 18, 0.82);
+  --glass-bg-subtle: rgba(18, 18, 22, 0.65);
+  --glass-blur: 24px;
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-focus: rgba(255, 255, 255, 0.28);
+  --glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
+
+  /* Nothing Signature Red Accent */
+  --accent-red: #d71921;
+  --accent-red-hover: #eb0029;
+  --accent-red-glow: rgba(215, 25, 33, 0.35);
+  --accent-red-subtle: rgba(215, 25, 33, 0.15);
+
+  /* Monochrome Foreground & Typography */
+  --text-pure-white: #ffffff;
+  --text-primary: #f2f2f4;
+  --text-secondary: #90909c;
+  --text-muted: #5e5e6b;
+  --text-on-accent: #ffffff;
+
+  /* Status Colors */
+  --status-success: #00d26a;
+  --status-warning: #f5a623;
+  --status-danger: #d71921;
+  --status-info: #00bfff;
+
+  /* Spatial & Layout Tokens */
+  --taskbar-height: 52px;
+  --titlebar-height: 40px;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  /* Dot Grid Pattern */
+  --dot-color: rgba(255, 255, 255, 0.07);
+  --dot-size: 1.5px;
+  --dot-space: 24px;
+
+  /* Safe Area Variables with fallback */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* Animation Timings */
+  --transition-instant: 100ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-smooth: 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-spring: 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Light Mode Overrides if toggled by user */
+[data-theme="light"] {
+  --bg-pure-black: #ffffff;
+  --bg-desk-base: #f4f4f6;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #f0f0f2;
+  --bg-surface-hover: #e6e6ea;
+  --bg-surface-active: #dcdce2;
+
+  --glass-bg: rgba(255, 255, 255, 0.86);
+  --glass-bg-subtle: rgba(250, 250, 252, 0.72);
+  --glass-border: rgba(0, 0, 0, 0.09);
+  --glass-border-focus: rgba(0, 0, 0, 0.25);
+  --glass-shadow: 0 16px 36px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.06);
+
+  --text-pure-white: #000000;
+  --text-primary: #121214;
+  --text-secondary: #656570;
+  --text-muted: #9c9ca8;
+
+  --dot-color: rgba(0, 0, 0, 0.06);
+}

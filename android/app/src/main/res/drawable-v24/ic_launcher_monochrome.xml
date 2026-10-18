@@ -1,0 +1,40 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <group
+        android:pivotX="512"
+        android:pivotY="512"
+        android:scaleX="0.68"
+        android:scaleY="0.68">
+        <!-- Monitor bezel outline -->
+        <path
+            android:pathData="M 730,294 H 256 C 235,294 218,311 218,332 V 592 C 218,613 235,630 256,630 H 782 C 803,630 820,613 820,592 V 357"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="34"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
+        <!-- Stand stem -->
+        <path
+            android:pathData="M 512,630 V 730"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="34"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
+        <!-- Stand base -->
+        <path
+            android:pathData="M 392,730 H 632"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="34"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
+        <!-- Monochrome status dot (white for system theme tinting) -->
+        <path
+            android:pathData="M 754,299 a 34,34 0 1,0 68,0 a 34,34 0 1,0 -68,0 Z"
+            android:fillColor="#FFFFFF" />
+    </group>
+</vector>

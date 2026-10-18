@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Nothing Dex monitor icon</title>
+  <desc>Minimal white monitor outline with an open top-right corner marked by a red dot.</desc>
+  <rect width="1024" height="1024" fill="#000000"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Monitor bezel intentionally stops before the red status dot. -->
+    <path d="M 730 294 H 256 C 235 294 218 311 218 332 V 592 C 218 613 235 630 256 630 H 782 C 803 630 820 613 820 592 V 357"/>
+    <!-- Stand and base -->
+    <path d="M 512 630 V 730"/>
+    <path d="M 392 730 H 632"/>
+  </g>
+  <circle cx="788" cy="299" r="32" fill="#FF1F32"/>
+</svg>

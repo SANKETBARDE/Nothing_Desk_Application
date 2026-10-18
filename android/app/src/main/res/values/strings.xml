@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nothing Desk</string>
+    <string name="title_activity_main">Nothing Desk</string>
+    <string name="package_name">tech.nothing.desk</string>
+    <string name="custom_url_scheme">tech.nothing.desk</string>
+</resources>
