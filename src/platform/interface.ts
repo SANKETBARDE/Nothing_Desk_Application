@@ -9,10 +9,12 @@ import type {
 
 export interface WifiStatus {
   isEnabled: boolean;
+  isConnected?: boolean;
   ssid?: string;
   signalStrength?: number;
   linkSpeedMbps?: number;
   frequencyMHz?: number;
+  locationRequired?: boolean;
 }
 
 export interface WifiNetworkItem {
@@ -21,6 +23,16 @@ export interface WifiNetworkItem {
   level: number;
   frequency: number;
   capabilities: string;
+}
+
+export interface HardwarePermissionsStatus {
+  allGranted: boolean;
+  location: boolean;
+  bluetooth: boolean;
+  camera: boolean;
+  contacts: boolean;
+  phone: boolean;
+  storage: boolean;
 }
 
 export interface BluetoothDeviceInfo {
@@ -136,6 +148,18 @@ export interface IPlatformAdapter {
 
   /** Opens Android Display Settings */
   openDisplaySettings(): Promise<NativeResult<boolean>>;
+
+  /** Opens Android Location Settings */
+  openLocationSettings(): Promise<NativeResult<boolean>>;
+
+  /** Opens Android App Details Settings for Nothing Desk */
+  openAppSettings(): Promise<NativeResult<boolean>>;
+
+  /** Check runtime hardware permissions */
+  checkHardwarePermissions(): Promise<HardwarePermissionsStatus>;
+
+  /** Request runtime hardware permissions */
+  requestHardwarePermissions(): Promise<NativeResult<boolean>>;
 
   /** Get live Wi-Fi connection info */
   getWifiInfo(): Promise<WifiStatus>;

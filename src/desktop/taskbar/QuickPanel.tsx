@@ -19,6 +19,9 @@ import {
   Lock,
   Eye,
   EyeOff,
+  ExternalLink,
+  ShieldAlert,
+  MapPin,
 } from 'lucide-react';
 import { platformAdapter } from '../../platform/nativeAdapter';
 import type {
@@ -30,6 +33,7 @@ import type {
   StorageInfo,
   MemoryInfo,
   DeviceInfo,
+  HardwarePermissionsStatus,
 } from '../../platform/interface';
 
 interface QuickPanelProps {
@@ -66,6 +70,7 @@ export const QuickPanel: React.FC<QuickPanelProps> = ({ isOpen, onClose, onOpenS
   const [storage, setStorage] = useState<StorageInfo | null>(null);
   const [memory, setMemory] = useState<MemoryInfo | null>(null);
   const [device, setDevice] = useState<DeviceInfo | null>(null);
+  const [permissions, setPermissions] = useState<HardwarePermissionsStatus | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -95,10 +100,40 @@ export const QuickPanel: React.FC<QuickPanelProps> = ({ isOpen, onClose, onOpenS
 
       const devInfo = await platformAdapter.getDeviceInfo();
       setDevice(devInfo);
+
+      const perms = await platformAdapter.checkHardwarePermissions();
+      setPermissions(perms);
     } catch {
       // Ignored
     }
   }, []);
+
+  const handleRequestPermissions = async () => {
+    await platformAdapter.requestHardwarePermissions();
+    setTimeout(async () => {
+      loadHardwareStatus();
+      handleScanWifi();
+    }, 1200);
+  };
+
+  const handleOpenAppSettings = async () => {
+    await platformAdapter.openAppSettings();
+  };
+
+  const handleOpenWifiPanel = async () => {
+    await platformAdapter.openWifiPanel();
+    setTimeout(loadHardwareStatus, 1500);
+  };
+
+  const handleOpenBluetoothSettings = async () => {
+    await platformAdapter.openBluetoothSettings();
+    setTimeout(loadHardwareStatus, 1500);
+  };
+
+  const handleOpenLocationSettings = async () => {
+    await platformAdapter.openLocationSettings();
+    setTimeout(handleScanWifi, 2000);
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -346,6 +381,69 @@ export const QuickPanel: React.FC<QuickPanelProps> = ({ isOpen, onClose, onOpenS
         )}
       </div>
 
+      {/* Permissions Status Banner (when hardware permissions are missing) */}
+      {permissions && !permissions.allGranted && (
+        <div
+          className="anim-fade-in"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 12px',
+            borderRadius: 'var(--radius-sm)',
+            background: 'rgba(215, 25, 33, 0.16)',
+            border: '1px solid var(--accent-red)',
+            gap: '8px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ShieldAlert size={16} color="var(--accent-red)" style={{ flexShrink: 0 }} />
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#fff' }}>
+                Hardware Permissions Needed
+              </span>
+              <span style={{ fontSize: '10px', color: '#ccc' }}>
+                Grant access for seamless Wi-Fi & Bluetooth control
+              </span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={handleRequestPermissions}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '4px',
+                background: 'var(--accent-red)',
+                border: 'none',
+                color: '#fff',
+                fontSize: '10px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Grant
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenAppSettings}
+              title="Open Android App Settings"
+              style={{
+                padding: '4px 8px',
+                borderRadius: '4px',
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#fff',
+                fontSize: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              Settings
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top 2 Primary Large Nothing Pill Widgets */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
         {/* Wi-Fi Pill Widget */}
@@ -370,6 +468,11 @@ export const QuickPanel: React.FC<QuickPanelProps> = ({ isOpen, onClose, onOpenS
             }}
           >
             <div
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleWifiPower(e);
+              }}
+              title={wifi.isEnabled ? 'Click to turn off Wi-Fi' : 'Click to turn on Wi-Fi'}
               style={{
                 width: '32px',
                 height: '32px',
@@ -380,6 +483,8 @@ export const QuickPanel: React.FC<QuickPanelProps> = ({ isOpen, onClose, onOpenS
                 justifyContent: 'center',
                 color: '#ffffff',
                 flexShrink: 0,
+                cursor: 'pointer',
+                transition: 'transform 0.15s ease',
               }}
             >
               {wifi.isEnabled ? <Wifi size={16} /> : <WifiOff size={16} />}
@@ -418,6 +523,11 @@ export const QuickPanel: React.FC<QuickPanelProps> = ({ isOpen, onClose, onOpenS
             }}
           >
             <div
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleBluetoothPower(e);
+              }}
+              title={bluetooth.isEnabled ? 'Click to turn off Bluetooth' : 'Click to turn on Bluetooth'}
               style={{
                 width: '32px',
                 height: '32px',
@@ -428,6 +538,8 @@ export const QuickPanel: React.FC<QuickPanelProps> = ({ isOpen, onClose, onOpenS
                 justifyContent: 'center',
                 color: '#ffffff',
                 flexShrink: 0,
+                cursor: 'pointer',
+                transition: 'transform 0.15s ease',
               }}
             >
               <Bluetooth size={16} />
@@ -467,6 +579,28 @@ export const QuickPanel: React.FC<QuickPanelProps> = ({ isOpen, onClose, onOpenS
               WI-FI NETWORKS
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* Settings Panel Button */}
+              <button
+                type="button"
+                onClick={handleOpenWifiPanel}
+                title="Open Android Wi-Fi / Internet Settings Panel"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#fff',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                <ExternalLink size={11} />
+                <span>Panel</span>
+              </button>
+
               {/* Scan Button */}
               {wifi.isEnabled && (
                 <button
@@ -628,8 +762,65 @@ export const QuickPanel: React.FC<QuickPanelProps> = ({ isOpen, onClose, onOpenS
                 </span>
 
                 {wifiNetworks.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '12px 0', color: '#888', fontSize: '11px' }}>
-                    {isScanningWifi ? 'Scanning for nearby Wi-Fi networks...' : 'No Wi-Fi networks found nearby. Click Scan.'}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '14px 8px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#aaa' }}>
+                      {isScanningWifi ? 'Scanning for nearby Wi-Fi networks...' : 'No Wi-Fi networks detected nearby.'}
+                    </span>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={handleScanWifi}
+                        style={{
+                          padding: '3px 9px',
+                          borderRadius: '4px',
+                          background: 'var(--accent-red)',
+                          border: 'none',
+                          color: '#fff',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Scan Again
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleOpenWifiPanel}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          color: '#fff',
+                          fontSize: '10px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <ExternalLink size={10} /> Wi-Fi Panel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleOpenLocationSettings}
+                        title="Android requires Location services for Wi-Fi scanning"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          color: '#fff',
+                          fontSize: '10px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <MapPin size={10} /> Location
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   wifiNetworks.map((net) => {
@@ -824,6 +1015,28 @@ export const QuickPanel: React.FC<QuickPanelProps> = ({ isOpen, onClose, onOpenS
               BLUETOOTH DEVICES
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* Settings Button */}
+              <button
+                type="button"
+                onClick={handleOpenBluetoothSettings}
+                title="Open Android Bluetooth Settings"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#fff',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                <ExternalLink size={11} />
+                <span>Settings</span>
+              </button>
+
               {/* Sync Button */}
               {bluetooth.isEnabled && (
                 <button
@@ -935,8 +1148,27 @@ export const QuickPanel: React.FC<QuickPanelProps> = ({ isOpen, onClose, onOpenS
               {/* Devices List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '180px', overflowY: 'auto' }}>
                 {bluetooth.bondedDevices.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '12px 0', color: '#888', fontSize: '11px' }}>
-                    No paired Bluetooth devices
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '14px 8px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#888' }}>No paired Bluetooth devices found</span>
+                    <button
+                      type="button"
+                      onClick={handleOpenBluetoothSettings}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 12px',
+                        borderRadius: '4px',
+                        background: 'var(--status-info)',
+                        border: 'none',
+                        color: '#000',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <ExternalLink size={11} /> Pair Device
+                    </button>
                   </div>
                 ) : (
                   bluetooth.bondedDevices.map((dev) => {
@@ -989,6 +1221,33 @@ export const QuickPanel: React.FC<QuickPanelProps> = ({ isOpen, onClose, onOpenS
                       </div>
                     );
                   })
+                )}
+
+                {/* Direct Pair in Settings Link Button */}
+                {bluetooth.bondedDevices.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleOpenBluetoothSettings}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '8px',
+                      borderRadius: '6px',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px dashed rgba(255, 255, 255, 0.15)',
+                      color: 'var(--status-info)',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      marginTop: '4px',
+                    }}
+                  >
+                    <Bluetooth size={13} />
+                    <span>Pair New Device in System Settings</span>
+                    <ExternalLink size={12} />
+                  </button>
                 )}
               </div>
             </>

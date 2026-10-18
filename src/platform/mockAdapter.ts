@@ -6,7 +6,7 @@ import type {
   NativeResult,
   OperatingMode,
 } from './capabilities';
-import type { IPlatformAdapter, WifiStatus, WifiNetworkItem, BluetoothStatus, DeviceContact, DeviceCallLogItem } from './interface';
+import type { IPlatformAdapter, WifiStatus, WifiNetworkItem, BluetoothStatus, DeviceContact, DeviceCallLogItem, HardwarePermissionsStatus } from './interface';
 
 /**
  * Mock Platform Adapter providing realistic browser & offline development emulation.
@@ -194,6 +194,30 @@ export class MockPlatformAdapter implements IPlatformAdapter {
   }
 
   async openDisplaySettings(): Promise<NativeResult<boolean>> {
+    return { ok: true, value: true };
+  }
+
+  async openLocationSettings(): Promise<NativeResult<boolean>> {
+    return { ok: true, value: true };
+  }
+
+  async openAppSettings(): Promise<NativeResult<boolean>> {
+    return { ok: true, value: true };
+  }
+
+  async checkHardwarePermissions(): Promise<HardwarePermissionsStatus> {
+    return {
+      allGranted: true,
+      location: true,
+      bluetooth: true,
+      camera: true,
+      contacts: true,
+      phone: true,
+      storage: true,
+    };
+  }
+
+  async requestHardwarePermissions(): Promise<NativeResult<boolean>> {
     return { ok: true, value: true };
   }
 

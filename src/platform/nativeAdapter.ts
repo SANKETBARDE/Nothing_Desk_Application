@@ -20,6 +20,7 @@ import type {
   PhotoItem,
   DeviceContact,
   DeviceCallLogItem,
+  HardwarePermissionsStatus,
 } from './interface';
 import { MockPlatformAdapter } from './mockAdapter';
 
@@ -58,8 +59,12 @@ interface SystemControlPluginNative {
   openBluetoothSettings(): Promise<{ success: boolean }>;
   openVolumePanel(): Promise<{ success: boolean }>;
   openDisplaySettings(): Promise<{ success: boolean }>;
+  openLocationSettings(): Promise<{ success: boolean }>;
+  openAppSettings(): Promise<{ success: boolean }>;
+  checkHardwarePermissions(): Promise<HardwarePermissionsStatus>;
+  requestHardwarePermissions(): Promise<{ requested: boolean }>;
   getWifiInfo(): Promise<WifiStatus>;
-  getWifiScanResults(): Promise<{ networks: WifiNetworkItem[] }>;
+  getWifiScanResults(): Promise<{ networks: WifiNetworkItem[]; locationRequired?: boolean }>;
   getBluetoothInfo(): Promise<BluetoothStatus>;
   toggleFlashlight(options: { enable: boolean }): Promise<{ success: boolean }>;
   getBatteryInfo(): Promise<BatteryInfo>;
@@ -73,7 +78,7 @@ interface SystemControlPluginNative {
   getDeviceContacts(): Promise<{ contacts: DeviceContact[] }>;
   getDeviceCallLog(): Promise<{ calls: DeviceCallLogItem[] }>;
   makePhoneCall(options: { number: string }): Promise<{ success: boolean }>;
-  setWifiEnabled(options: { enable: boolean }): Promise<{ success: boolean; isEnabled: boolean }>;
+  setWifiEnabled(options: { enable: boolean }): Promise<{ success: boolean; isEnabled: boolean; openedPanel?: boolean }>;
   connectWifi(options: { ssid: string; password?: string }): Promise<{ success: boolean; ssid: string }>;
   disconnectWifi(): Promise<{ success: boolean }>;
   setBluetoothEnabled(options: { enable: boolean }): Promise<{ success: boolean; isEnabled: boolean }>;
@@ -251,6 +256,53 @@ export class NativePlatformAdapter implements IPlatformAdapter {
       return { ok: true, value: res.success };
     } catch {
       return { ok: false, code: 'DISPLAY_SETTINGS_FAILED', message: 'Failed to open display settings' };
+    }
+  }
+
+  async openLocationSettings(): Promise<NativeResult<boolean>> {
+    if (!this.isNative) return this.fallbackMock.openLocationSettings();
+    try {
+      const res = await SystemControl.openLocationSettings();
+      return { ok: true, value: res.success };
+    } catch {
+      return { ok: false, code: 'LOCATION_SETTINGS_FAILED', message: 'Failed to open location settings' };
+    }
+  }
+
+  async openAppSettings(): Promise<NativeResult<boolean>> {
+    if (!this.isNative) return this.fallbackMock.openAppSettings();
+    try {
+      const res = await SystemControl.openAppSettings();
+      return { ok: true, value: res.success };
+    } catch {
+      return { ok: false, code: 'APP_SETTINGS_FAILED', message: 'Failed to open app settings' };
+    }
+  }
+
+  async checkHardwarePermissions(): Promise<HardwarePermissionsStatus> {
+    if (!this.isNative) return this.fallbackMock.checkHardwarePermissions();
+    try {
+      return await SystemControl.checkHardwarePermissions();
+    } catch {
+      return {
+        allGranted: false,
+        location: false,
+        bluetooth: false,
+        camera: false,
+        contacts: false,
+        phone: false,
+        storage: false,
+      };
+    }
+  }
+
+  async requestHardwarePermissions(): Promise<NativeResult<boolean>> {
+    if (!this.isNative) return this.fallbackMock.requestHardwarePermissions();
+    try {
+      const res = await SystemControl.requestHardwarePermissions();
+      return { ok: true, value: res.requested };
+    } catch (e: unknown) {
+      return { ok: false, code: 'PERM_REQUEST_FAILED', message: (e as Error).message };
     }
   }
 

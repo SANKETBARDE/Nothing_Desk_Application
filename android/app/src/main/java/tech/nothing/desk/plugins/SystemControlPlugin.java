@@ -7,6 +7,8 @@ import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.location.LocationManager;
 import android.hardware.camera2.CameraManager;
 import android.media.AudioManager;
 import android.net.ConnectivityManager;
@@ -337,23 +339,153 @@ public class SystemControlPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void openLocationSettings(PluginCall call) {
+        try {
+            Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            JSObject res = new JSObject();
+            res.put("success", true);
+            call.resolve(res);
+        } catch (Exception e) {
+            call.reject("Failed to open Location settings: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.fromParts("package", getContext().getPackageName(), null));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            JSObject res = new JSObject();
+            res.put("success", true);
+            call.resolve(res);
+        } catch (Exception e) {
+            call.reject("Failed to open app settings: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void checkHardwarePermissions(PluginCall call) {
+        Context ctx = getContext();
+        boolean hasFineLoc = ctx.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        boolean hasCoarseLoc = ctx.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        boolean hasLocation = hasFineLoc || hasCoarseLoc;
+
+        boolean hasBt = true;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            hasBt = ctx.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+        }
+
+        boolean hasCamera = ctx.checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+        boolean hasContacts = ctx.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED;
+        boolean hasPhone = ctx.checkSelfPermission(android.Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED;
+
+        boolean hasStorage = true;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            hasStorage = ctx.checkSelfPermission(android.Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED;
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            hasStorage = ctx.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+        }
+
+        boolean allGranted = hasLocation && hasBt && hasCamera && hasContacts && hasPhone && hasStorage;
+
+        JSObject res = new JSObject();
+        res.put("allGranted", allGranted);
+        res.put("location", hasLocation);
+        res.put("bluetooth", hasBt);
+        res.put("camera", hasCamera);
+        res.put("contacts", hasContacts);
+        res.put("phone", hasPhone);
+        res.put("storage", hasStorage);
+        call.resolve(res);
+    }
+
+    @PluginMethod
+    public void requestHardwarePermissions(PluginCall call) {
+        Activity act = getActivity();
+        if (act != null) {
+            act.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    tech.nothing.desk.MainActivity.requestAllPermissions(act);
+                }
+            });
+        }
+        JSObject res = new JSObject();
+        res.put("requested", true);
+        call.resolve(res);
+    }
+
+    @PluginMethod
     public void getWifiInfo(PluginCall call) {
         WifiManager wm = (WifiManager) getContext().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         boolean isEnabled = wm != null && wm.isWifiEnabled();
-        WifiInfo connectionInfo = wm != null ? wm.getConnectionInfo() : null;
-        
-        String ssid = connectionInfo != null && connectionInfo.getSSID() != null ? connectionInfo.getSSID().replace("\"", "") : "Connected";
-        if ("<unknown ssid>".equals(ssid) || ssid.isEmpty()) {
-            ssid = isEnabled ? "Wi-Fi Connected" : "Wi-Fi Off";
+
+        ConnectivityManager cm = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+        boolean isConnected = false;
+        String resolvedSsid = null;
+        int linkSpeed = 0;
+        int frequency = 0;
+        int signalLevel = 0;
+
+        if (cm != null) {
+            Network activeNet = cm.getActiveNetwork();
+            if (activeNet != null) {
+                NetworkCapabilities caps = cm.getNetworkCapabilities(activeNet);
+                if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                    isConnected = true;
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        try {
+                            Object transportInfo = caps.getTransportInfo();
+                            if (transportInfo instanceof WifiInfo) {
+                                WifiInfo wi = (WifiInfo) transportInfo;
+                                resolvedSsid = wi.getSSID();
+                                linkSpeed = wi.getLinkSpeed();
+                                frequency = wi.getFrequency();
+                                signalLevel = WifiManager.calculateSignalLevel(wi.getRssi(), 5);
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
         }
 
-        int linkSpeed = connectionInfo != null ? connectionInfo.getLinkSpeed() : 0;
-        int frequency = connectionInfo != null ? connectionInfo.getFrequency() : 0;
-        int signalLevel = connectionInfo != null ? WifiManager.calculateSignalLevel(connectionInfo.getRssi(), 5) : 0;
+        if (wm != null && (resolvedSsid == null || "<unknown ssid>".equals(resolvedSsid))) {
+            try {
+                WifiInfo connectionInfo = wm.getConnectionInfo();
+                if (connectionInfo != null) {
+                    if (connectionInfo.getNetworkId() != -1) {
+                        isConnected = true;
+                    }
+                    if (resolvedSsid == null || "<unknown ssid>".equals(resolvedSsid)) {
+                        resolvedSsid = connectionInfo.getSSID();
+                    }
+                    if (linkSpeed == 0) linkSpeed = connectionInfo.getLinkSpeed();
+                    if (frequency == 0) frequency = connectionInfo.getFrequency();
+                    if (signalLevel == 0) signalLevel = WifiManager.calculateSignalLevel(connectionInfo.getRssi(), 5);
+                }
+            } catch (Exception ignored) {}
+        }
+
+        String finalSsid = null;
+        if (isConnected) {
+            if (resolvedSsid != null) {
+                resolvedSsid = resolvedSsid.replace("\"", "");
+            }
+            if (resolvedSsid == null || resolvedSsid.isEmpty() || "<unknown ssid>".equals(resolvedSsid) || "0x".equals(resolvedSsid)) {
+                finalSsid = "Connected Wi-Fi";
+            } else {
+                finalSsid = resolvedSsid;
+            }
+        }
 
         JSObject res = new JSObject();
         res.put("isEnabled", isEnabled);
-        res.put("ssid", ssid);
+        res.put("isConnected", isConnected);
+        res.put("ssid", finalSsid);
         res.put("linkSpeedMbps", linkSpeed);
         res.put("frequencyMHz", frequency);
         res.put("signalStrength", signalLevel);
@@ -364,10 +496,20 @@ public class SystemControlPlugin extends Plugin {
     public void getWifiScanResults(PluginCall call) {
         try {
             WifiManager wm = (WifiManager) getContext().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            LocationManager lm = (LocationManager) getContext().getSystemService(Context.LOCATION_SERVICE);
+            boolean isLocationEnabled = lm != null && (lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER));
+
             JSArray results = new JSArray();
-            if (wm != null) {
-                try { wm.startScan(); } catch (Exception ignored) {}
-                List<ScanResult> scanResults = wm.getScanResults();
+            if (wm != null && wm.isWifiEnabled()) {
+                try {
+                    wm.startScan();
+                } catch (Exception ignored) {}
+
+                List<ScanResult> scanResults = null;
+                try {
+                    scanResults = wm.getScanResults();
+                } catch (SecurityException ignored) {}
+
                 if (scanResults != null) {
                     for (ScanResult sr : scanResults) {
                         if (sr.SSID == null || sr.SSID.isEmpty()) continue;
@@ -383,61 +525,54 @@ public class SystemControlPlugin extends Plugin {
             }
             JSObject res = new JSObject();
             res.put("networks", results);
+            res.put("locationRequired", !isLocationEnabled);
             call.resolve(res);
         } catch (Exception e) {
             JSObject res = new JSObject();
             res.put("networks", new JSArray());
+            res.put("locationRequired", false);
             call.resolve(res);
         }
-    }
-
-    @PluginMethod
-    public void getBluetoothInfo(PluginCall call) {
-        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-        boolean isEnabled = adapter != null && adapter.isEnabled();
-        JSArray devicesArray = new JSArray();
-
-        if (adapter != null && isEnabled) {
-            try {
-                Set<BluetoothDevice> bonded = adapter.getBondedDevices();
-                if (bonded != null) {
-                    for (BluetoothDevice device : bonded) {
-                        JSObject devObj = new JSObject();
-                        devObj.put("name", device.getName() != null ? device.getName() : "Bluetooth Device");
-                        devObj.put("address", device.getAddress());
-                        devObj.put("isConnected", false);
-                        devicesArray.put(devObj);
-                    }
-                }
-            } catch (SecurityException e) {
-                // Android 12+ permission boundary handled gracefully
-            }
-        }
-
-        JSObject res = new JSObject();
-        res.put("isEnabled", isEnabled);
-        res.put("bondedDevices", devicesArray);
-        call.resolve(res);
     }
 
     @PluginMethod
     public void setWifiEnabled(PluginCall call) {
         boolean enable = Boolean.TRUE.equals(call.getBoolean("enable", true));
+        boolean toggledDirectly = false;
         try {
             WifiManager wm = (WifiManager) getContext().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-            if (wm != null) {
-                wm.setWifiEnabled(enable);
+            if (wm != null && Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                toggledDirectly = wm.setWifiEnabled(enable);
             }
-            JSObject res = new JSObject();
-            res.put("success", true);
-            res.put("isEnabled", enable);
-            call.resolve(res);
-        } catch (Exception e) {
-            JSObject res = new JSObject();
-            res.put("success", false);
-            res.put("message", e.getMessage());
-            call.resolve(res);
+        } catch (Exception ignored) {}
+
+        boolean openedPanel = false;
+        if (!toggledDirectly) {
+            try {
+                Intent panelIntent;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    panelIntent = new Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY);
+                } else {
+                    panelIntent = new Intent(Settings.ACTION_WIFI_SETTINGS);
+                }
+                panelIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(panelIntent);
+                openedPanel = true;
+            } catch (Exception e) {
+                try {
+                    Intent fallback = new Intent(Settings.ACTION_WIFI_SETTINGS);
+                    fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    getContext().startActivity(fallback);
+                    openedPanel = true;
+                } catch (Exception ignored) {}
+            }
         }
+
+        JSObject res = new JSObject();
+        res.put("success", toggledDirectly || openedPanel);
+        res.put("isEnabled", enable);
+        res.put("openedPanel", openedPanel);
+        call.resolve(res);
     }
 
     @PluginMethod
@@ -454,7 +589,9 @@ public class SystemControlPlugin extends Plugin {
             if (wm != null) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     try {
-                        WifiNetworkSuggestion.Builder builder = new WifiNetworkSuggestion.Builder().setSsid(ssid);
+                        WifiNetworkSuggestion.Builder builder = new WifiNetworkSuggestion.Builder()
+                                .setSsid(ssid)
+                                .setIsAppInteractionRequired(false);
                         if (password != null && !password.isEmpty()) {
                             builder.setWpa2Passphrase(password);
                         }
@@ -481,6 +618,17 @@ public class SystemControlPlugin extends Plugin {
                 } catch (Exception ignored) {}
             }
 
+            try {
+                Intent panelIntent;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    panelIntent = new Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY);
+                } else {
+                    panelIntent = new Intent(Settings.ACTION_WIFI_SETTINGS);
+                }
+                panelIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(panelIntent);
+            } catch (Exception ignored) {}
+
             JSObject res = new JSObject();
             res.put("success", true);
             res.put("ssid", ssid);
@@ -506,25 +654,96 @@ public class SystemControlPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void getBluetoothInfo(PluginCall call) {
+        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        boolean isEnabled = adapter != null && adapter.isEnabled();
+        JSArray devicesArray = new JSArray();
+
+        if (adapter != null && isEnabled) {
+            try {
+                Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+                if (bonded != null) {
+                    for (BluetoothDevice device : bonded) {
+                        JSObject devObj = new JSObject();
+                        String name = "Bluetooth Device";
+                        try {
+                            name = device.getName();
+                            if (name == null || name.isEmpty()) {
+                                name = device.getAddress();
+                            }
+                        } catch (SecurityException ignored) {}
+
+                        devObj.put("name", name != null ? name : "Bluetooth Device");
+                        devObj.put("address", device.getAddress());
+
+                        boolean isConnected = false;
+                        try {
+                            Method isConnectedMethod = device.getClass().getMethod("isConnected");
+                            isConnected = Boolean.TRUE.equals(isConnectedMethod.invoke(device));
+                        } catch (Exception ignored) {}
+
+                        devObj.put("isConnected", isConnected);
+                        devicesArray.put(devObj);
+                    }
+                }
+            } catch (SecurityException ignored) {}
+        }
+
+        JSObject res = new JSObject();
+        res.put("isEnabled", isEnabled);
+        res.put("bondedDevices", devicesArray);
+        call.resolve(res);
+    }
+
+    @PluginMethod
     public void setBluetoothEnabled(PluginCall call) {
         boolean enable = Boolean.TRUE.equals(call.getBoolean("enable", true));
-        try {
-            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-            boolean ok = false;
-            if (adapter != null) {
-                if (enable) {
-                    ok = adapter.enable();
-                } else {
-                    ok = adapter.disable();
+        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        if (adapter == null) {
+            call.reject("Bluetooth is not supported on this device.");
+            return;
+        }
+
+        boolean directSuccess = false;
+        if (enable) {
+            try {
+                directSuccess = adapter.enable();
+            } catch (Exception ignored) {}
+
+            if (!directSuccess || !adapter.isEnabled()) {
+                try {
+                    Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                    enableBtIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    getContext().startActivity(enableBtIntent);
+                    directSuccess = true;
+                } catch (Exception e) {
+                    try {
+                        Intent settingsIntent = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+                        settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        getContext().startActivity(settingsIntent);
+                        directSuccess = true;
+                    } catch (Exception ignored) {}
                 }
             }
-            JSObject res = new JSObject();
-            res.put("success", ok);
-            res.put("isEnabled", enable);
-            call.resolve(res);
-        } catch (Exception e) {
-            call.reject("Failed to toggle Bluetooth: " + e.getMessage());
+        } else {
+            try {
+                directSuccess = adapter.disable();
+            } catch (Exception ignored) {}
+
+            if (!directSuccess && adapter.isEnabled()) {
+                try {
+                    Intent settingsIntent = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+                    settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    getContext().startActivity(settingsIntent);
+                    directSuccess = true;
+                } catch (Exception ignored) {}
+            }
         }
+
+        JSObject res = new JSObject();
+        res.put("success", directSuccess);
+        res.put("isEnabled", enable);
+        call.resolve(res);
     }
 
     @PluginMethod
@@ -542,12 +761,24 @@ public class SystemControlPlugin extends Plugin {
                 if (device != null) {
                     try {
                         Method connectMethod = device.getClass().getMethod("connect");
+                        connectMethod.setAccessible(true);
                         connectMethod.invoke(device);
                     } catch (Exception e) {
-                        device.createBond();
+                        try {
+                            if (device.getBondState() != BluetoothDevice.BOND_BONDED) {
+                                device.createBond();
+                            }
+                        } catch (Exception ignored) {}
                     }
                 }
             }
+
+            try {
+                Intent settingsIntent = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+                settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(settingsIntent);
+            } catch (Exception ignored) {}
+
             JSObject res = new JSObject();
             res.put("success", true);
             call.resolve(res);
@@ -571,10 +802,18 @@ public class SystemControlPlugin extends Plugin {
                 if (device != null) {
                     try {
                         Method disconnectMethod = device.getClass().getMethod("disconnect");
+                        disconnectMethod.setAccessible(true);
                         disconnectMethod.invoke(device);
                     } catch (Exception ignored) {}
                 }
             }
+
+            try {
+                Intent settingsIntent = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+                settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(settingsIntent);
+            } catch (Exception ignored) {}
+
             JSObject res = new JSObject();
             res.put("success", true);
             call.resolve(res);

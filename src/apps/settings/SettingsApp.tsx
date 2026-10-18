@@ -3,8 +3,8 @@ import { StorageService } from '../../persistence/storage';
 import type { DesktopPreferences, IconScale, ThemeMode } from '../../persistence/schema';
 import { platformAdapter } from '../../platform/nativeAdapter';
 import type { DesktopCapabilities } from '../../platform/capabilities';
-import { Palette, Monitor, RefreshCw, CheckCircle2, HardDrive, Cpu, Battery } from 'lucide-react';
-import type { DeviceInfo, StorageInfo, MemoryInfo, BatteryInfo } from '../../platform/interface';
+import { Palette, Monitor, RefreshCw, CheckCircle2, HardDrive, Cpu, Battery, ShieldCheck, ExternalLink, Check, X, Wifi, Bluetooth } from 'lucide-react';
+import type { DeviceInfo, StorageInfo, MemoryInfo, BatteryInfo, HardwarePermissionsStatus } from '../../platform/interface';
 
 interface SettingsAppProps {
   windowId: string;
@@ -12,14 +12,20 @@ interface SettingsAppProps {
 }
 
 export const SettingsApp: React.FC<SettingsAppProps> = ({ onPreferencesChange }) => {
-  const [activeTab, setActiveTab] = useState<'appearance' | 'system' | 'reset'>('appearance');
+  const [activeTab, setActiveTab] = useState<'appearance' | 'system' | 'permissions' | 'reset'>('appearance');
   const [prefs, setPrefs] = useState<DesktopPreferences>(() => StorageService.loadPreferences());
   const [caps, setCaps] = useState<DesktopCapabilities | null>(null);
   const [device, setDevice] = useState<DeviceInfo | null>(null);
   const [storage, setStorage] = useState<StorageInfo | null>(null);
   const [memory, setMemory] = useState<MemoryInfo | null>(null);
   const [battery, setBattery] = useState<BatteryInfo | null>(null);
+  const [perms, setPerms] = useState<HardwarePermissionsStatus | null>(null);
+  const [permMessage, setPermMessage] = useState<string | null>(null);
   const [resetConfirmed, setResetConfirmed] = useState(false);
+
+  const loadPerms = () => {
+    platformAdapter.checkHardwarePermissions().then(setPerms);
+  };
 
   useEffect(() => {
     platformAdapter.getCapabilities().then(setCaps);
@@ -27,6 +33,7 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({ onPreferencesChange })
     platformAdapter.getStorageInfo().then(setStorage);
     platformAdapter.getMemoryInfo().then(setMemory);
     platformAdapter.getBatteryInfo().then(setBattery);
+    loadPerms();
   }, []);
 
   const handleUpdate = (updated: Partial<DesktopPreferences>) => {
@@ -91,6 +98,24 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({ onPreferencesChange })
           }}
         >
           <Monitor size={15} color="var(--accent-red)" /> Device & Bridge
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('permissions');
+            loadPerms();
+          }}
+          style={{
+            justifyContent: 'flex-start',
+            gap: '8px',
+            padding: '8px 10px',
+            borderRadius: 'var(--radius-xs)',
+            background: activeTab === 'permissions' ? 'var(--bg-surface-hover)' : 'transparent',
+            color: activeTab === 'permissions' ? 'var(--text-pure-white)' : 'var(--text-secondary)',
+          }}
+        >
+          <ShieldCheck size={15} color={perms?.allGranted ? '#00d26a' : 'var(--accent-red)'} /> Permissions
         </button>
 
         <button
@@ -368,6 +393,205 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({ onPreferencesChange })
                 <span style={{ color: 'var(--text-secondary)' }}>Native Android Bridge:</span>
                 <span style={{ color: '#00d26a' }}>Connected & Active</span>
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'permissions' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '4px' }}>Hardware & System Permissions</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                Nothing Desk requires Android hardware permissions to control Wi-Fi, Bluetooth, flashlight, volume, and storage without disruptions.
+              </p>
+            </div>
+
+            {permMessage && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: '#00d26a',
+                  background: 'rgba(0, 210, 106, 0.1)',
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '12px',
+                }}
+              >
+                <CheckCircle2 size={16} /> {permMessage}
+              </div>
+            )}
+
+            {/* Permission Status Cards */}
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--glass-border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '14px',
+              }}
+            >
+              {[
+                {
+                  id: 'wifi',
+                  label: 'Wi-Fi & Nearby Devices',
+                  description: 'Enables scanning and connecting to Wi-Fi networks in desktop mode.',
+                  granted: perms?.location || false,
+                },
+                {
+                  id: 'bluetooth',
+                  label: 'Bluetooth & Peripherals',
+                  description: 'Required for pairing and connecting Bluetooth mice, keyboards, and audio.',
+                  granted: perms?.bluetooth ?? true,
+                },
+                {
+                  id: 'location',
+                  label: 'Location (GPS / Network)',
+                  description: 'Required by Android to detect SSIDs and nearby Wi-Fi broadcast beacons.',
+                  granted: perms?.location ?? false,
+                },
+                {
+                  id: 'storage',
+                  label: 'Storage & Media Files',
+                  description: 'Allows Nothing Desk File Access and Photos utilities to browse documents and media.',
+                  granted: perms?.storage ?? true,
+                },
+                {
+                  id: 'camera',
+                  label: 'Camera & Torch',
+                  description: 'Required for the Flashlight toggle and Camera app.',
+                  granted: perms?.camera ?? false,
+                },
+                {
+                  id: 'phone',
+                  label: 'Phone Dialer & Contacts',
+                  description: 'Allows searching contacts and placing direct calls from desktop utilities.',
+                  granted: Boolean(perms?.contacts && perms?.phone),
+                },
+              ].map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 0',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: 600, fontSize: '13px' }}>{item.label}</span>
+                    </div>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>
+                      {item.description}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '3px 8px',
+                      borderRadius: '12px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      background: item.granted ? 'rgba(0, 210, 106, 0.15)' : 'rgba(215, 25, 33, 0.15)',
+                      color: item.granted ? '#00d26a' : 'var(--accent-red)',
+                    }}
+                  >
+                    {item.granted ? <Check size={12} /> : <X size={12} />}
+                    <span>{item.granted ? 'Granted' : 'Missing'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  await platformAdapter.requestHardwarePermissions();
+                  setPermMessage('Permission request prompted on screen. Please accept all requested permissions.');
+                  setTimeout(() => {
+                    loadPerms();
+                    setPermMessage(null);
+                  }, 2500);
+                }}
+                style={{
+                  background: 'var(--accent-red)',
+                  color: '#ffffff',
+                  padding: '9px 18px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                Grant All Required Permissions
+              </button>
+
+              <button
+                type="button"
+                onClick={() => platformAdapter.openAppSettings()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid var(--glass-border)',
+                  color: '#ffffff',
+                  padding: '9px 16px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                <ExternalLink size={14} /> Open Android App Info Settings
+              </button>
+
+              <button
+                type="button"
+                onClick={() => platformAdapter.openWifiPanel()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid var(--glass-border)',
+                  color: '#ffffff',
+                  padding: '9px 16px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                <Wifi size={14} /> Wi-Fi Settings Panel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => platformAdapter.openBluetoothSettings()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid var(--glass-border)',
+                  color: '#ffffff',
+                  padding: '9px 16px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                <Bluetooth size={14} /> Bluetooth Settings
+              </button>
             </div>
           </div>
         )}
